@@ -12,12 +12,12 @@ use tempfile::{NamedTempFile, tempdir};
 
 fn binary_path() -> std::path::PathBuf {
     let mut p = std::env::current_exe().unwrap();
-    // Move from deps/<test_binary> → target/<profile>/deploy-manager
+    // Move from deps/<test_binary> -> target/<profile>/deploy-agent
     p.pop(); // remove test binary name
     if p.ends_with("deps") {
         p.pop(); // remove "deps"
     }
-    p.join("deploy-manager")
+    p.join("deploy-agent")
 }
 
 fn run_with_config(json: &str, extra_args: &[&str]) -> std::process::Output {
@@ -28,7 +28,7 @@ fn run_with_config(json: &str, extra_args: &[&str]) -> std::process::Output {
         .arg(f.path())
         .args(extra_args)
         .output()
-        .expect("failed to run deploy-manager binary")
+        .expect("failed to run deploy-agent binary")
 }
 
     fn json_path(path: &std::path::Path) -> String {
@@ -174,7 +174,7 @@ fn test_unset_env() {
     let workspace = tempdir().unwrap();
     let out_file = workspace.path().join("unset_env_value.txt");
     let out_file_json = json_string(&json_path(&out_file));
-    let key = "DEPLOY_MANAGER_TEST_TEMP_VAR_12345";
+    let key = "DEPLOY_AGENT_TEST_TEMP_VAR_12345";
 
     let config = format!(
         r#"{{
@@ -195,7 +195,7 @@ fn test_unset_env() {
 #[test]
 fn test_dry_run_does_not_execute() {
     // Write a file if executed; expect NOT to exist with --dry-run.
-    let marker = std::env::temp_dir().join("deploy_manager_dry_run_marker.txt");
+    let marker = std::env::temp_dir().join("deploy_agent_dry_run_marker.txt");
     let _ = std::fs::remove_file(&marker);
     let marker_json = json_string(&json_path(&marker));
     let config = format!(
@@ -271,8 +271,8 @@ fn test_on_failure_stop_default() {
 
 #[test]
 fn test_background_action() {
-    // Run a child deploy-manager process in background and wait for its marker.
-    let marker = std::env::temp_dir().join("deploy_manager_bg_test.txt");
+    // Run a child deploy-agent process in background and wait for its marker.
+    let marker = std::env::temp_dir().join("deploy_agent_bg_test.txt");
     let _ = std::fs::remove_file(&marker);
     let marker_json = json_string(&json_path(&marker));
 
@@ -418,7 +418,7 @@ fn test_wait_action_requires_duration() {
 
 #[test]
 fn test_wait_until_file_exists_success() {
-    let marker = std::env::temp_dir().join("deploy_manager_wait_file_ready.txt");
+    let marker = std::env::temp_dir().join("deploy_agent_wait_file_ready.txt");
     let _ = std::fs::remove_file(&marker);
     let marker_json = json_path(&marker);
     let marker_value_json = json_string(&marker_json);
@@ -453,7 +453,7 @@ fn test_wait_until_file_exists_success() {
 
 #[test]
 fn test_wait_until_file_exists_times_out() {
-    let marker = std::env::temp_dir().join("deploy_manager_wait_missing_file.txt");
+    let marker = std::env::temp_dir().join("deploy_agent_wait_missing_file.txt");
     let _ = std::fs::remove_file(&marker);
     let marker_json = json_path(&marker);
     let marker_value_json = json_string(&marker_json);
@@ -481,7 +481,7 @@ fn test_wait_until_file_exists_times_out() {
 
 #[test]
 fn test_wait_until_file_exists_dry_run_skips_polling() {
-    let marker = std::env::temp_dir().join("deploy_manager_wait_dry_run_file.txt");
+    let marker = std::env::temp_dir().join("deploy_agent_wait_dry_run_file.txt");
     let _ = std::fs::remove_file(&marker);
     let marker_json = json_path(&marker);
     let marker_value_json = json_string(&marker_json);

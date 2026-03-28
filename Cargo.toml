@@ -1,5 +1,5 @@
 [package]
-name = "deploy-manager"
+name = "deploy-agent"
 version = "0.1.0"
 edition = "2021"
 description = "A CLI application that executes deployment actions defined in a JSON configuration file"
@@ -7,7 +7,7 @@ authors = []
 license = "MIT"
 
 [[bin]]
-name = "deploy-manager"
+name = "deploy-agent"
 path = "src/main.rs"
 
 [dependencies]

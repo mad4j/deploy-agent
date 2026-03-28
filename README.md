@@ -1,4 +1,4 @@
-# deploy-manager
+# deploy-agent
 
 CLI Rust che esegue azioni di deploy definite in un file JSON.
 

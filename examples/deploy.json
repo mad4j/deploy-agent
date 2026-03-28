@@ -2,7 +2,7 @@
   "name": "my-app-deployment",
   "env": {
     "APP_NAME": "my-app",
-    "BUILD_DIR": "./tmp/deploy-manager-example-build"
+    "BUILD_DIR": "./tmp/deploy-agent-example-build"
   },
   "actions": [
     {

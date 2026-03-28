@@ -10,9 +10,9 @@ use std::process;
 /// Execute deployment actions defined in a JSON configuration file.
 ///
 /// Example:
-///   deploy-manager --config deploy.json --verbose
+///   deploy-agent --config deploy.json --verbose
 #[derive(Parser, Debug)]
-#[command(name = "deploy-manager", version, about)]
+#[command(name = "deploy-agent", version, about)]
 struct Cli {
     /// Path to the JSON configuration file.
     #[arg(short, long, default_value = "deploy.json")]
