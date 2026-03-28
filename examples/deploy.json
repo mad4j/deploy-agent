@@ -1,0 +1,48 @@
+{
+  "name": "my-app-deployment",
+  "env": {
+    "APP_NAME": "my-app",
+    "BUILD_DIR": "/tmp/deploy-manager-example-build"
+  },
+  "actions": [
+    {
+      "name": "print-env",
+      "type": "shell",
+      "command": "echo \"Deploying ${APP_NAME}\""
+    },
+    {
+      "name": "create-build-dir",
+      "type": "shell",
+      "command": "mkdir -p ${BUILD_DIR}"
+    },
+    {
+      "name": "set-version",
+      "type": "set_env",
+      "key": "VERSION",
+      "value": "1.0.0"
+    },
+    {
+      "name": "write-version-file",
+      "type": "shell",
+      "command": "echo ${VERSION} > ${BUILD_DIR}/version.txt && cat ${BUILD_DIR}/version.txt"
+    },
+    {
+      "name": "background-task",
+      "type": "shell",
+      "command": "sleep 1 && echo 'background done' > /tmp/dm-bg-example.log",
+      "background": true
+    },
+    {
+      "name": "list-files",
+      "type": "run",
+      "command": "ls",
+      "args": ["-la", "${BUILD_DIR}"],
+      "on_failure": "continue"
+    },
+    {
+      "name": "cleanup",
+      "type": "shell",
+      "command": "rm -rf ${BUILD_DIR}"
+    }
+  ]
+}
