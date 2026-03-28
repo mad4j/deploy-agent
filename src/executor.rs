@@ -44,9 +44,11 @@ impl Executor {
             for (k, v) in global_env {
                 let v = self.substitute(v);
                 self.env.insert(k.clone(), v.clone());
-                // Also propagate into the current process so child processes
-                // can inherit without explicit --env passing.
-                // SAFETY: single-threaded at this point.
+                // Propagate into the current process so child processes can
+                // inherit via the OS environment.  This must only be called
+                // from a single-threaded context; the executor is deliberately
+                // single-threaded (background work is delegated to child
+                // processes, not Rust threads) so this is safe.
                 std::env::set_var(k, &v);
                 self.logger.env_set(k, &v);
             }
@@ -302,16 +304,17 @@ impl Executor {
         }
     }
 
-    /// Replace `${VAR}` and `$VAR` placeholders with values from the
-    /// accumulated environment map, then from the OS environment.
+    /// Replace `${VAR}` placeholders with values from the accumulated
+    /// environment map, then from the OS environment.
+    ///
+    /// Only the `${VAR}` form is supported; bare `$VAR` is intentionally *not*
+    /// expanded because it is ambiguous when variable names share prefixes
+    /// (e.g. `$FOO` vs `$FOOBAR`).
     fn substitute(&self, s: &str) -> String {
         let mut out = s.to_string();
         // Internal env takes priority.
         for (k, v) in &self.env {
             out = out.replace(&format!("${{{k}}}"), v);
-            // Only replace bare $VAR if not already part of a ${...} group.
-            // Simple heuristic: replace only word-boundary variants.
-            out = out.replace(&format!("${k}"), v);
         }
         // Fall back to OS env for anything still unreplaced.
         for (k, v) in std::env::vars() {

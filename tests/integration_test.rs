@@ -121,8 +121,9 @@ fn test_on_failure_continue() {
       ]
     }"#;
     let out = run_with_config(config, &[]);
-    // Even though "fail" fails, we continue, so the binary should exit with 1
-    // (because there was one failure) but "after" must have run.
+    // "fail" fails but we continue, so "after" must have run and the binary
+    // must exit with a non-zero code because one action failed.
+    assert!(!out.status.success(), "exit code must be non-zero when an action fails");
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
         stdout.contains("still_running"),
