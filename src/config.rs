@@ -32,6 +32,16 @@ pub struct Action {
     /// action starts immediately.  All background processes are joined at the
     /// end of the run.
     pub background: Option<bool>,
+    /// For `wait`: how long to pause execution, in milliseconds.
+    pub duration_ms: Option<u64>,
+    /// For `wait`: file path that must appear before continuing.
+    pub until_file_exists: Option<String>,
+    /// For `wait`: URL that must respond with a success status before continuing.
+    pub until_http_ok: Option<String>,
+    /// For `wait`: maximum time to wait before failing, in milliseconds.
+    pub timeout_ms: Option<u64>,
+    /// For `wait`: polling interval for conditional waits, in milliseconds.
+    pub interval_ms: Option<u64>,
     /// For `set_env` / `unset_env`: the variable name.
     pub key: Option<String>,
     /// For `set_env`: the variable value.
@@ -57,6 +67,8 @@ pub enum ActionType {
     Run,
     /// Execute an arbitrary shell expression.
     Shell,
+    /// Pause execution for a fixed duration.
+    Wait,
     /// Set (or override) an environment variable for subsequent actions.
     SetEnv,
     /// Remove an environment variable for subsequent actions.

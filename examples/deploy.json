@@ -33,6 +33,21 @@
       "background": true
     },
     {
+      "name": "wait-for-background-demo",
+      "type": "wait",
+      "until_file_exists": "/tmp/dm-bg-example.log",
+      "timeout_ms": 5000,
+      "interval_ms": 200
+    },
+    {
+      "name": "wait-for-healthcheck",
+      "type": "wait",
+      "until_http_ok": "http://127.0.0.1:8080/health",
+      "timeout_ms": 5000,
+      "interval_ms": 250,
+      "on_failure": "continue"
+    },
+    {
       "name": "list-files",
       "type": "run",
       "command": "ls",
