@@ -24,15 +24,10 @@ impl Logger {
 
     /// Print the top-level banner for the deployment.
     pub fn header(&self, name: &str) {
-        let bar = "═".repeat(64);
-        println!("{}", bar.bright_cyan());
         println!(
-            "{}  {}  {}",
-            "║".bright_cyan(),
-            format!("🚀  Deploy Manager  —  {name}").bright_white().bold(),
-            "║".bright_cyan(),
+            "{}",
+            format!("◆  Deploy Manager  —  {name}").bright_white().bold(),
         );
-        println!("{}", bar.bright_cyan());
     }
 
     /// Print a section heading.
@@ -152,18 +147,15 @@ impl Logger {
 
     /// Print the final summary footer.
     pub fn footer(&self, total: usize, success: usize, failed: usize, skipped: usize) {
-        let bar = "═".repeat(64);
         println!();
-        println!("{}", bar.bright_cyan());
+
         let summary = format!(
             "  total: {total}  ✓ success: {success}  ✗ failed: {failed}  ↷ skipped: {skipped}"
         );
-        let colored_summary = if failed > 0 {
+        if failed > 0 {
             summary.bright_red().to_string()
         } else {
             summary.bright_green().to_string()
         };
-        println!("{}  {}", "║".bright_cyan(), colored_summary);
-        println!("{}", bar.bright_cyan());
     }
 }
