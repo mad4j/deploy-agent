@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
-use tempfile::NamedTempFile;
+use tempfile::{NamedTempFile, tempdir};
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -124,55 +124,72 @@ fn test_shell_action_success() {
         }
       ]
     }"#;
-    let out = run_with_config(config, &[]);
+    let out = run_with_config(&config, &[]);
     assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
 }
 
 #[test]
 fn test_run_action_success() {
-    let config = r#"
-    {
-      "name": "test",
-      "actions": [
-        {
-          "name": "echo",
-          "type": "run",
-          "command": "echo",
-          "args": ["hello", "world"]
-        }
-      ]
-    }"#;
-    let out = run_with_config(config, &[]);
+    let cmd_json = json_string(&json_path(&binary_path()));
+    let config = format!(
+        r#"{{
+          "name": "test",
+          "actions": [
+            {{
+              "name": "version",
+              "type": "run",
+              "command": {cmd_json},
+              "args": ["--version"]
+            }}
+          ]
+        }}"#
+    );
+    let out = run_with_config(&config, &[]);
     assert!(out.status.success());
 }
 
 #[test]
 fn test_set_env_and_substitution() {
-    let config = r#"
-    {
-      "name": "test",
-      "actions": [
-        { "name": "set", "type": "set_env", "key": "MY_VAR", "value": "42" },
-        { "name": "use", "type": "shell",   "command": "test \"${MY_VAR}\" = \"42\"" }
-      ]
-    }"#;
-    let out = run_with_config(config, &[]);
+    let workspace = tempdir().unwrap();
+    let out_file = workspace.path().join("set_env_value.txt");
+    let out_file_json = json_string(&json_path(&out_file));
+
+    let config = format!(
+        r#"{{
+          "name": "test",
+          "actions": [
+            {{ "name": "set", "type": "set_env", "key": "MY_VAR", "value": "42" }},
+            {{ "name": "use", "type": "write_file", "path": {out_file_json}, "content": "${{MY_VAR}}" }}
+          ]
+        }}"#
+    );
+    let out = run_with_config(&config, &[]);
     assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let content = std::fs::read_to_string(&out_file).unwrap();
+    assert_eq!(content, "42");
 }
 
 #[test]
 fn test_unset_env() {
-    let config = r#"
-    {
-      "name": "test",
-      "actions": [
-        { "name": "set",   "type": "set_env",   "key": "TEMP_VAR", "value": "yes" },
-        { "name": "unset", "type": "unset_env", "key": "TEMP_VAR" },
-        { "name": "check", "type": "shell",     "command": "test -z \"${TEMP_VAR}\"" }
-      ]
-    }"#;
-    let out = run_with_config(config, &[]);
+    let workspace = tempdir().unwrap();
+    let out_file = workspace.path().join("unset_env_value.txt");
+    let out_file_json = json_string(&json_path(&out_file));
+    let key = "DEPLOY_MANAGER_TEST_TEMP_VAR_12345";
+
+    let config = format!(
+        r#"{{
+          "name": "test",
+          "actions": [
+            {{ "name": "set", "type": "set_env", "key": "{key}", "value": "yes" }},
+            {{ "name": "unset", "type": "unset_env", "key": "{key}" }},
+            {{ "name": "check", "type": "write_file", "path": {out_file_json}, "content": "${{{key}}}" }}
+          ]
+        }}"#
+    );
+    let out = run_with_config(&config, &[]);
     assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let content = std::fs::read_to_string(&out_file).unwrap();
+    assert_eq!(content, format!("${{{key}}}"));
 }
 
 #[test]
@@ -180,14 +197,14 @@ fn test_dry_run_does_not_execute() {
     // Write a file if executed; expect NOT to exist with --dry-run.
     let marker = std::env::temp_dir().join("deploy_manager_dry_run_marker.txt");
     let _ = std::fs::remove_file(&marker);
+    let marker_json = json_string(&json_path(&marker));
     let config = format!(
         r#"{{
           "name": "test",
           "actions": [
-            {{ "name": "touch", "type": "shell", "command": "touch {}" }}
+            {{ "name": "write", "type": "write_file", "path": {marker_json}, "content": "dry-run" }}
           ]
-        }}"#,
-        marker.display()
+        }}"#
     );
     let out = run_with_config(&config, &["--dry-run"]);
     assert!(out.status.success());
@@ -196,84 +213,130 @@ fn test_dry_run_does_not_execute() {
 
 #[test]
 fn test_on_failure_continue() {
-    let config = r#"
-    {
-      "name": "test",
-      "actions": [
-        { "name": "fail",   "type": "shell", "command": "false", "on_failure": "continue" },
-        { "name": "after",  "type": "shell", "command": "echo still_running" }
-      ]
-    }"#;
-    let out = run_with_config(config, &[]);
-    // "fail" fails but we continue, so "after" must have run and the binary
-    // must exit with a non-zero code because one action failed.
-    assert!(!out.status.success(), "exit code must be non-zero when an action fails");
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(
-        stdout.contains("still_running"),
-        "stdout: {stdout}"
-    );
-}
+    let workspace = tempdir().unwrap();
+    let marker = workspace.path().join("continue_marker.txt");
+    let marker_json = json_string(&json_path(&marker));
+    let missing_source_json = json_string(&json_path(&workspace.path().join("missing-source.txt")));
 
-#[test]
-fn test_on_failure_stop_default() {
-    // With default on_failure=stop the second action must NOT run.
-    let config = r#"
-    {
-      "name": "test",
-      "actions": [
-        { "name": "fail",  "type": "shell", "command": "false" },
-        { "name": "after", "type": "shell", "command": "echo should_not_appear" }
-      ]
-    }"#;
-    let out = run_with_config(config, &[]);
-    assert!(!out.status.success());
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(
-        !stdout.contains("should_not_appear"),
-        "stdout: {stdout}"
-    );
-}
-
-#[test]
-fn test_background_action() {
-    // A background action that writes a file after a short delay.
-    let marker = std::env::temp_dir().join("deploy_manager_bg_test.txt");
-    let _ = std::fs::remove_file(&marker);
     let config = format!(
         r#"{{
           "name": "test",
           "actions": [
             {{
-              "name": "bg-write",
-              "type": "shell",
-              "command": "echo bg_done > {}",
-              "background": true
-            }}
+              "name": "fail",
+              "type": "copy_file",
+              "source": {missing_source_json},
+              "destination": {marker_json},
+              "on_failure": "continue"
+            }},
+            {{ "name": "after", "type": "write_file", "path": {marker_json}, "content": "still_running" }}
           ]
-        }}"#,
-        marker.display()
+        }}"#
     );
     let out = run_with_config(&config, &[]);
+    // "fail" fails but we continue, so "after" must have run and the binary
+    // must exit with a non-zero code because one action failed.
+    assert!(!out.status.success(), "exit code must be non-zero when an action fails");
+    assert!(marker.exists(), "follow-up action should still run with on_failure=continue");
+    let content = std::fs::read_to_string(&marker).unwrap();
+    assert_eq!(content, "still_running");
+}
+
+#[test]
+fn test_on_failure_stop_default() {
+    // With default on_failure=stop the second action must NOT run.
+    let workspace = tempdir().unwrap();
+    let marker = workspace.path().join("stop_marker.txt");
+    let marker_json = json_string(&json_path(&marker));
+    let missing_source_json = json_string(&json_path(&workspace.path().join("missing-source.txt")));
+
+    let config = format!(
+        r#"{{
+          "name": "test",
+          "actions": [
+            {{
+              "name": "fail",
+              "type": "copy_file",
+              "source": {missing_source_json},
+              "destination": {marker_json}
+            }},
+            {{ "name": "after", "type": "write_file", "path": {marker_json}, "content": "should_not_appear" }}
+          ]
+        }}"#
+    );
+    let out = run_with_config(&config, &[]);
+    assert!(!out.status.success());
+    assert!(!marker.exists(), "default on_failure=stop must skip the following action");
+}
+
+#[test]
+fn test_background_action() {
+    // Run a child deploy-manager process in background and wait for its marker.
+    let marker = std::env::temp_dir().join("deploy_manager_bg_test.txt");
+    let _ = std::fs::remove_file(&marker);
+    let marker_json = json_string(&json_path(&marker));
+
+    let mut child_config_file = NamedTempFile::new().unwrap();
+    let child_config = format!(
+        r#"{{
+          "name": "child",
+          "actions": [
+            {{ "name": "pause", "type": "wait", "duration_ms": 150 }},
+            {{ "name": "write", "type": "write_file", "path": {marker_json}, "content": "bg_done" }}
+          ]
+        }}"#
+    );
+    child_config_file.write_all(child_config.as_bytes()).unwrap();
+    let child_config_path_json = json_string(&json_path(child_config_file.path()));
+    let cmd_json = json_string(&json_path(&binary_path()));
+
+    let config = format!(
+        r#"{{
+          "name": "test",
+          "actions": [
+            {{
+              "name": "bg-child",
+              "type": "run",
+              "command": {cmd_json},
+              "args": ["--config", {child_config_path_json}],
+              "background": true
+            }},
+            {{
+              "name": "wait-for-child",
+              "type": "wait",
+              "until_file_exists": {marker_json},
+              "timeout_ms": 5000,
+              "interval_ms": 50
+            }}
+          ]
+        }}"#
+    );
+
+    let out = run_with_config(&config, &[]);
     assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
-    // The file must have been created once the executor joined the background
-    // process.
     assert!(marker.exists(), "background process must have created the marker file");
     let _ = std::fs::remove_file(&marker);
 }
 
 #[test]
 fn test_global_env_substitution() {
-    let config = r#"
-    {
-      "name": "test",
-      "env": { "GREETING": "hello" },
-      "actions": [
-        { "name": "greet", "type": "shell", "command": "test \"${GREETING}\" = \"hello\"" }
-      ]
-    }"#;
-    let out = run_with_config(config, &[]);
+    let workspace = tempdir().unwrap();
+    let out_file = workspace.path().join("global_env_value.txt");
+    let out_file_json = json_string(&json_path(&out_file));
+
+    let config = format!(
+        r#"{{
+          "name": "test",
+          "env": {{ "GREETING": "hello" }},
+          "actions": [
+            {{ "name": "greet", "type": "write_file", "path": {out_file_json}, "content": "${{GREETING}}" }}
+          ]
+        }}"#
+    );
+    let out = run_with_config(&config, &[]);
     assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let content = std::fs::read_to_string(&out_file).unwrap();
+    assert_eq!(content, "hello");
 }
 
 #[test]
@@ -288,7 +351,7 @@ fn test_verbose_flag_accepted() {
     {
       "name": "test",
       "actions": [
-        { "name": "ok", "type": "shell", "command": "echo verbose_test" }
+        { "name": "ok", "type": "wait", "duration_ms": 1 }
       ]
     }"#;
     let out = run_with_config(config, &["--verbose"]);
@@ -530,4 +593,87 @@ fn test_wait_until_http_ok_dry_run_skips_polling() {
       elapsed < Duration::from_millis(2500),
         "dry-run HTTP wait should not poll until timeout: {elapsed:?}"
     );
+}
+
+#[test]
+fn test_filesystem_actions_success() {
+    let workspace = tempdir().unwrap();
+    let root_json = json_string(&json_path(workspace.path()));
+    let source = workspace.path().join("work").join("source.txt");
+    let source_json = json_string(&json_path(&source));
+    let copy = workspace.path().join("work").join("copy.txt");
+    let copy_json = json_string(&json_path(&copy));
+    let moved = workspace.path().join("work").join("moved.txt");
+    let moved_json = json_string(&json_path(&moved));
+
+    let config = format!(
+        r#"{{
+          "name": "test-fs",
+          "actions": [
+            {{ "name": "mkdir", "type": "mkdir", "path": "${{ROOT}}/work" }},
+            {{ "name": "write", "type": "write_file", "path": {source_json}, "content": "hello-${{APP}}" }},
+            {{ "name": "copy", "type": "copy_file", "source": {source_json}, "destination": {copy_json} }},
+            {{ "name": "move", "type": "move_file", "source": {copy_json}, "destination": {moved_json} }},
+            {{ "name": "remove-source", "type": "remove_path", "path": {source_json} }}
+          ],
+          "env": {{
+            "ROOT": {root_json},
+            "APP": "demo"
+          }}
+        }}"#
+    );
+
+    let out = run_with_config(&config, &[]);
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(!source.exists(), "source should have been removed");
+    assert!(moved.exists(), "moved file should exist");
+    let text = std::fs::read_to_string(&moved).unwrap();
+    assert_eq!(text, "hello-demo");
+}
+
+#[test]
+fn test_copy_file_requires_overwrite_when_destination_exists() {
+    let workspace = tempdir().unwrap();
+    let source = workspace.path().join("source.txt");
+    let destination = workspace.path().join("destination.txt");
+    std::fs::write(&source, "v1").unwrap();
+    std::fs::write(&destination, "v2").unwrap();
+    let source_json = json_string(&json_path(&source));
+    let destination_json = json_string(&json_path(&destination));
+
+    let config = format!(
+        r#"{{
+          "name": "test-fs-overwrite",
+          "actions": [
+            {{ "name": "copy", "type": "copy_file", "source": {source_json}, "destination": {destination_json} }}
+          ]
+        }}"#
+    );
+
+    let out = run_with_config(&config, &[]);
+    assert!(!out.status.success(), "copy without overwrite should fail");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("overwrite"), "stderr: {stderr}");
+    let destination_text = std::fs::read_to_string(&destination).unwrap();
+    assert_eq!(destination_text, "v2");
+}
+
+#[test]
+fn test_write_file_dry_run_does_not_create_file() {
+    let workspace = tempdir().unwrap();
+    let target = workspace.path().join("nested").join("dry-run.txt");
+    let target_json = json_string(&json_path(&target));
+
+    let config = format!(
+        r#"{{
+          "name": "test-fs-dry-run",
+          "actions": [
+            {{ "name": "write", "type": "write_file", "path": {target_json}, "content": "dry-run" }}
+          ]
+        }}"#
+    );
+
+    let out = run_with_config(&config, &["--dry-run"]);
+    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(!target.exists(), "dry-run must not create target file");
 }

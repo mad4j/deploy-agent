@@ -19,6 +19,11 @@ impl Executor {
             ActionType::Wait => self.wait_action(action, label, is_bg),
             ActionType::SetEnv => self.set_env_action(action, label),
             ActionType::UnsetEnv => self.unset_env_action(action, label),
+            ActionType::Mkdir => self.mkdir_action(action, label, is_bg),
+            ActionType::WriteFile => self.write_file_action(action, label, is_bg),
+            ActionType::CopyFile => self.copy_file_action(action, label, is_bg),
+            ActionType::MoveFile => self.move_file_action(action, label, is_bg),
+            ActionType::RemovePath => self.remove_path_action(action, label, is_bg),
         }
     }
 }

@@ -2,19 +2,9 @@
   "name": "my-app-deployment",
   "env": {
     "APP_NAME": "my-app",
-    "BUILD_DIR": "/tmp/deploy-manager-example-build"
+    "BUILD_DIR": "./tmp/deploy-manager-example-build"
   },
   "actions": [
-    {
-      "name": "print-env",
-      "type": "shell",
-      "command": "echo \"Deploying ${APP_NAME}\""
-    },
-    {
-      "name": "create-build-dir",
-      "type": "shell",
-      "command": "mkdir -p ${BUILD_DIR}"
-    },
     {
       "name": "set-version",
       "type": "set_env",
@@ -22,42 +12,49 @@
       "value": "1.0.0"
     },
     {
+      "name": "create-build-dir",
+      "type": "mkdir",
+      "path": "${BUILD_DIR}",
+      "recursive": true
+    },
+    {
       "name": "write-version-file",
-      "type": "shell",
-      "command": "echo ${VERSION} > ${BUILD_DIR}/version.txt && cat ${BUILD_DIR}/version.txt"
+      "type": "write_file",
+      "path": "${BUILD_DIR}/version.txt",
+      "content": "${APP_NAME}-${VERSION}\n"
     },
     {
-      "name": "background-task",
-      "type": "shell",
-      "command": "sleep 1 && echo 'background done' > /tmp/dm-bg-example.log",
-      "background": true
+      "name": "backup-version-file",
+      "type": "copy_file",
+      "source": "${BUILD_DIR}/version.txt",
+      "destination": "${BUILD_DIR}/version.bak",
+      "overwrite": true
     },
     {
-      "name": "wait-for-background-demo",
+      "name": "rename-backup",
+      "type": "move_file",
+      "source": "${BUILD_DIR}/version.bak",
+      "destination": "${BUILD_DIR}/version.previous.txt",
+      "overwrite": true
+    },
+    {
+      "name": "wait-for-version",
       "type": "wait",
-      "until_file_exists": "/tmp/dm-bg-example.log",
+      "until_file_exists": "${BUILD_DIR}/version.txt",
       "timeout_ms": 5000,
       "interval_ms": 200
     },
     {
-      "name": "wait-for-healthcheck",
-      "type": "wait",
-      "until_http_ok": "http://127.0.0.1:8080/health",
-      "timeout_ms": 5000,
-      "interval_ms": 250,
-      "on_failure": "continue"
+      "name": "cleanup-version-backup",
+      "type": "remove_path",
+      "path": "${BUILD_DIR}/version.previous.txt",
+      "ignore_missing": true
     },
     {
-      "name": "list-files",
-      "type": "run",
-      "command": "ls",
-      "args": ["-la", "${BUILD_DIR}"],
-      "on_failure": "continue"
-    },
-    {
-      "name": "cleanup",
-      "type": "shell",
-      "command": "rm -rf ${BUILD_DIR}"
+      "name": "cleanup-build-dir",
+      "type": "remove_path",
+      "path": "${BUILD_DIR}",
+      "recursive": true
     }
   ]
 }

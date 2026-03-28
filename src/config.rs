@@ -46,6 +46,22 @@ pub struct Action {
     pub key: Option<String>,
     /// For `set_env`: the variable value.
     pub value: Option<String>,
+    /// For file-system actions: path of the target file or directory.
+    pub path: Option<String>,
+    /// For `copy_file` / `move_file`: source path.
+    pub source: Option<String>,
+    /// For `copy_file` / `move_file`: destination path.
+    pub destination: Option<String>,
+    /// For `write_file`: content to write.
+    pub content: Option<String>,
+    /// For `write_file`: append instead of overwrite.
+    pub append: Option<bool>,
+    /// For directory creation/removal: recurse into parent or child paths.
+    pub recursive: Option<bool>,
+    /// For copy/move: allow replacing existing destination.
+    pub overwrite: Option<bool>,
+    /// For `remove_path`: do not fail if path is missing.
+    pub ignore_missing: Option<bool>,
     /// What to do when this action fails: `"stop"` (default) or `"continue"`.
     pub on_failure: Option<OnFailure>,
 }
@@ -73,4 +89,14 @@ pub enum ActionType {
     SetEnv,
     /// Remove an environment variable for subsequent actions.
     UnsetEnv,
+    /// Create a directory.
+    Mkdir,
+    /// Write text to a file.
+    WriteFile,
+    /// Copy a file.
+    CopyFile,
+    /// Move or rename a file.
+    MoveFile,
+    /// Remove a file or directory.
+    RemovePath,
 }
