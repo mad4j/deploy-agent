@@ -1,21 +1,21 @@
 # deploy-agent
 
-CLI Rust che esegue azioni di deploy definite in un file JSON.
+Rust CLI that executes deployment actions defined in a JSON file.
 
-## Azioni supportate
+## Supported actions
 
-- `run`: esegue un programma con argomenti opzionali
-- `shell`: esegue un comando shell
-- `wait`: sospende l'esecuzione per una durata fissa, finche' compare un file o finche' un endpoint HTTP risponde con successo
-- `set_env`: imposta una variabile d'ambiente per le azioni successive
-- `unset_env`: rimuove una variabile d'ambiente per le azioni successive
-- `mkdir`: crea directory senza dipendere da `mkdir` della shell
-- `write_file`: scrive o appende testo a un file
-- `copy_file`: copia un file da `source` a `destination`
-- `move_file`: sposta/rinomina un file da `source` a `destination`
-- `remove_path`: elimina file o directory
+- `run`: executes a program with optional arguments
+- `shell`: executes a shell command
+- `wait`: pauses execution for a fixed duration, until a file appears, or until an HTTP endpoint responds successfully
+- `set_env`: sets an environment variable for subsequent actions
+- `unset_env`: removes an environment variable for subsequent actions
+- `mkdir`: creates directories without relying on shell `mkdir`
+- `write_file`: writes or appends text to a file
+- `copy_file`: copies a file from `source` to `destination`
+- `move_file`: moves/renames a file from `source` to `destination`
+- `remove_path`: removes a file or directory
 
-## Esempio
+## Example
 
 ```json
 {
@@ -68,7 +68,7 @@ CLI Rust che esegue azioni di deploy definite in un file JSON.
 
 ## File-system actions
 
-Le action file-system permettono di ridurre i comandi shell dipendenti dal sistema operativo (`mkdir`, `cp`, `mv`, `rm`, redirection `>`).
+File-system actions help reduce OS-dependent shell commands (`mkdir`, `cp`, `mv`, `rm`, redirection `>`).
 
 `mkdir`
 
@@ -129,18 +129,18 @@ Le action file-system permettono di ridurre i comandi shell dipendenti dal siste
 }
 ```
 
-Note operative:
+Operational notes:
 
-- `mkdir`, `write_file`, `copy_file`, `move_file`, `remove_path` non supportano `background: true`
-- in `copy_file` e `move_file`, se `destination` esiste serve `overwrite: true`
-- `write_file` crea automaticamente le directory parent se mancanti
-- in `remove_path`, `recursive` default = `false` e `ignore_missing` default = `false`
+- `mkdir`, `write_file`, `copy_file`, `move_file`, and `remove_path` do not support `background: true`
+- in `copy_file` and `move_file`, if `destination` exists, `overwrite: true` is required
+- `write_file` automatically creates missing parent directories
+- in `remove_path`, `recursive` default = `false` and `ignore_missing` default = `false`
 
 ## Wait action
 
-L'azione `wait` supporta tre modalita'.
+The `wait` action supports three modes.
 
-Attesa fissa:
+Fixed wait:
 
 ```json
 {
@@ -150,7 +150,7 @@ Attesa fissa:
 }
 ```
 
-Attesa fino alla comparsa di un file:
+Wait until a file appears:
 
 ```json
 {
@@ -162,7 +162,7 @@ Attesa fino alla comparsa di un file:
 }
 ```
 
-Attesa fino a risposta HTTP di successo:
+Wait until a successful HTTP response:
 
 ```json
 {
@@ -174,15 +174,15 @@ Attesa fino a risposta HTTP di successo:
 }
 ```
 
-Note operative:
+Operational notes:
 
-- bisogna specificare uno solo tra `duration_ms`, `until_file_exists` e `until_http_ok`
-- per `until_file_exists` e `until_http_ok`, `timeout_ms` default = `30000` e `interval_ms` default = `200`
-- `interval_ms` deve essere maggiore di `0`
-- `wait` non supporta `background: true`
-- con `--dry-run` la pausa viene loggata ma non eseguita
+- you must specify only one of `duration_ms`, `until_file_exists`, and `until_http_ok`
+- for `until_file_exists` and `until_http_ok`, `timeout_ms` default = `30000` and `interval_ms` default = `200`
+- `interval_ms` must be greater than `0`
+- `wait` does not support `background: true`
+- with `--dry-run`, the wait is logged but not executed
 
-## Esecuzione
+## Run
 
 ```bash
 cargo run --release -- --config .\examples\deploy.json
